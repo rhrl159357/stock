@@ -1,0 +1,35 @@
+# standard build and node modules
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# environment variables
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# project-specific secrets
+src/config/apiKeys.js
+
+# temporary test scripts and fixing scripts
+test_*.js
+check_*.js
+fix_*.js
+test_*.mjs
+test_*.cjs
+
+# editor files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS files
+.DS_Store
+Thumbs.db
