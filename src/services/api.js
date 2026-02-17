@@ -16,54 +16,69 @@ export const fetchStockData = async (symbol, timeframe = '1d') => {
 
     const { interval, range } = configMap[timeframe] || configMap['1d'];
 
-    try {
-        const url = `/api/yahoo/v8/finance/chart/${sym}?interval=${interval}&range=${range}`;
+    const maxRetries = 3;
+    let delay = 1000; // Start with 1s delay
 
-        console.log(`[Yahoo API] Fetching ${sym} (${timeframe})`);
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`Failed to fetch data for ${sym} (Status: ${response.status})`);
-        }
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            const url = `/api/yahoo/v8/finance/chart/${sym}?interval=${interval}&range=${range}`;
+            console.log(`[Yahoo API] Fetching ${sym} (${timeframe}) - Attempt ${attempt + 1}`);
 
-        const data = await response.json();
-        const result = data.chart.result?.[0];
-        if (!result) throw new Error(`No data found for symbol: ${sym}`);
+            const response = await fetch(url);
 
-        const timestamps = result.timestamp;
-        const indicators = result.indicators.quote[0];
-        const adjuncts = result.indicators.adjclose ? result.indicators.adjclose[0].adjclose : null;
-
-        if (!timestamps || !indicators) throw new Error(`Invalid data format for ${sym}`);
-
-        const formattedData = timestamps.map((timestamp, index) => {
-            if (indicators.open[index] === null || indicators.close[index] === null) return null;
-
-            // For lightweight-charts:
-            // Daily/Weekly: 'YYYY-MM-DD'
-            // Intraday: UTCTimestamp (number in seconds)
-            let timeValue;
-            if (interval === '1d' || interval === '1wk') {
-                const d = new Date(timestamp * 1000);
-                timeValue = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
-            } else {
-                timeValue = timestamp; // Unix timestamp for intraday
+            if (response.status === 429) {
+                console.warn(`[Yahoo API] Rate limit hit (429) for ${sym}. Retrying in ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                delay *= 2; // Exponential backoff
+                continue;
             }
 
-            return {
-                time: timeValue,
-                open: indicators.open[index],
-                high: indicators.high[index],
-                low: indicators.low[index],
-                close: adjuncts && (interval === '1d' || interval === '1wk') ? adjuncts[index] : indicators.close[index],
-                volume: indicators.volume[index],
-            };
-        }).filter(item => item !== null);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch data for ${sym} (Status: ${response.status})`);
+            }
 
-        return formattedData;
+            const data = await response.json();
+            const result = data.chart.result?.[0];
+            if (!result) throw new Error(`No data found for symbol: ${sym}`);
 
-    } catch (err) {
-        console.error('[Yahoo API Error]:', err.message);
-        throw err;
+            const timestamps = result.timestamp;
+            const indicators = result.indicators.quote[0];
+            const adjuncts = result.indicators.adjclose ? result.indicators.adjclose[0].adjclose : null;
+
+            if (!timestamps || !indicators) throw new Error(`Invalid data format for ${sym}`);
+
+            const formattedData = timestamps.map((timestamp, index) => {
+                if (indicators.open[index] === null || indicators.close[index] === null) return null;
+
+                let timeValue;
+                if (interval === '1d' || interval === '1wk') {
+                    const d = new Date(timestamp * 1000);
+                    timeValue = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+                } else {
+                    timeValue = timestamp;
+                }
+
+                return {
+                    time: timeValue,
+                    open: indicators.open[index],
+                    high: indicators.high[index],
+                    low: indicators.low[index],
+                    close: adjuncts && (interval === '1d' || interval === '1wk') ? adjuncts[index] : indicators.close[index],
+                    volume: indicators.volume[index],
+                };
+            }).filter(item => item !== null);
+
+            return formattedData;
+
+        } catch (err) {
+            if (attempt === maxRetries - 1) {
+                console.error('[Yahoo API Error]:', err.message);
+                throw err;
+            }
+            console.warn(`[Yahoo API] Attempt ${attempt + 1} failed for ${sym}. Retrying...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            delay *= 2;
+        }
     }
 };
 

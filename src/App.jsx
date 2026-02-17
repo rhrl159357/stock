@@ -255,8 +255,8 @@ function App() {
             }
 
             setScanProgress(prev => ({ ...prev, current: i + 1 }));
-            // API 과부하 방지를 위한 미세 딜레이
-            await new Promise(resolve => setTimeout(resolve, 200));
+            // API 과부하 방지를 위한 충분한 딜레이 (429 방어)
+            await new Promise(resolve => setTimeout(resolve, 600));
         }
 
         setScanProgress(prev => ({ ...prev, isScanning: false }));
