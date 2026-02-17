@@ -125,11 +125,4 @@ const SignalDecoder = ({ signal, t, lang }) => {
     );
 };
 
-<div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', fontSize: '0.9em', color: '#666' }}>
-    {t.investmentNotice}
-</div>
-        </div >
-    );
-};
-
 export default SignalDecoder;
