@@ -138,7 +138,12 @@ function App() {
 
                 // 필터용 데이터 누적 (사이드바 리스트 유지용 - 스캐너와 동일하게 MTF 없이 체크)
                 const { markers: lenientSignals } = generateAllSignals(stockData, null, timeframe);
-                const todayMarkerLenient = lenientSignals.find(m => m.shape === 'arrowUp' && m.time === stockData[stockData.length - 1].time);
+
+                // 오늘/최근 타점 확인 (최근 2개 봉 검사로 유지력 강화)
+                const todayMarkerLenient = lenientSignals.find(m =>
+                    m.shape === 'arrowUp' &&
+                    (m.time === stockData[stockData.length - 1].time || (stockData.length > 1 && m.time === stockData[stockData.length - 2].time))
+                );
 
                 let yesterdayMarkerLenient = null;
                 const yIdx = stockData.length - 2;
@@ -221,11 +226,13 @@ function App() {
                     // MTF는 속도를 위해 null로 전달 (필요시 데이터 추가 가능)
                     const { markers: allSignals } = generateAllSignals(stockData, null, timeframe);
 
-                    // 1. 오늘 타점 확인 (마지막 데이터가 오늘 날짜/인덱스인 상황)
-                    const todayMarker = allSignals.find(m => m.shape === 'arrowUp' && m.time === stockData[stockData.length - 1].time);
+                    // 1. 오늘/최근 타점 확인 (데이터 업데이트 오차 고려하여 최근 2개 봉 검사)
+                    const todayMarker = allSignals.find(m =>
+                        m.shape === 'arrowUp' &&
+                        (m.time === stockData[stockData.length - 1].time || (stockData.length > 1 && m.time === stockData[stockData.length - 2].time))
+                    );
 
-                    // 2. 어제 타점 확인 (어제 마지막 봉에 신호가 찍혔는지 확인)
-                    // 데일리 타임프레임 기준, 마지막에서 두 번째 데이터가 '어제'라고 가정 (정밀 판별 로직)
+                    // 2. 어제 타점 확인 (정확히 어제 고정)
                     const yesterdayIdx = stockData.length - 2;
                     let yesterdayMarker = null;
                     if (yesterdayIdx >= 0) {

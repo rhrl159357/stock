@@ -18,9 +18,9 @@ const Sidebar = ({ companies, onSelect, selectedSymbol, t, scanResults, scanProg
 
         // 2. 분리된 필터링 로직
         if (filterMode === 'today') {
-            list = list.filter(c => scanResults[c.symbol]?.isBuyToday);
+            list = list.filter(c => scanResults[c.symbol]?.isBuyToday || c.symbol === selectedSymbol);
         } else if (filterMode === 'yesterday') {
-            list = list.filter(c => scanResults[c.symbol]?.isBuyYesterday);
+            list = list.filter(c => scanResults[c.symbol]?.isBuyYesterday || c.symbol === selectedSymbol);
         }
         return list;
     };
