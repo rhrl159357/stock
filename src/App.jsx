@@ -136,13 +136,24 @@ function App() {
 
                 setAnalysis({ ...marketAnalysis, strategy, standardBar: foundStandardBar, refNode, referenceLines });
 
-                // 필터용 데이터 누적
+                // 필터용 데이터 누적 (사이드바 리스트 유지용 - 스캐너와 동일하게 MTF 없이 체크)
+                const { markers: lenientSignals } = generateAllSignals(stockData, null, timeframe);
+                const todayMarkerLenient = lenientSignals.find(m => m.shape === 'arrowUp' && m.time === stockData[stockData.length - 1].time);
+
+                let yesterdayMarkerLenient = null;
+                const yIdx = stockData.length - 2;
+                if (yIdx >= 0) {
+                    const yTime = stockData[yIdx].time;
+                    yesterdayMarkerLenient = lenientSignals.find(m => m.shape === 'arrowUp' && m.time === yTime);
+                }
+
                 setScanResults(prev => ({
                     ...prev,
                     [symbol]: {
-                        action: strategy.action.en,
+                        isBuyToday: !!todayMarkerLenient,
+                        isBuyYesterday: !!yesterdayMarkerLenient,
                         currentPrice: currentPrice,
-                        targetBuyPrice: parseFloat(strategy.targetBuyPrice)
+                        targetBuyPrice: parseFloat(strategy.targetBuyPrice) || 0
                     }
                 }));
 
@@ -195,14 +206,40 @@ function App() {
                     const currentPrice = prices[prices.length - 1];
                     const prevPrice = prices.length > 1 ? prices[prices.length - 2] : currentPrice;
 
-                    const strategy = recommendStrategy(currentPrice, smas, marketAnalysis.perfectOrder, foundStandardBar, prevPrice, prices, volumes, marketAnalysis, rsi, refNode, additionalData);
+                    const strategyDay = recommendStrategy(currentPrice, smas, marketAnalysis.perfectOrder, foundStandardBar, prevPrice, prices, volumes, marketAnalysis, rsi, refNode, additionalData);
+
+                    let strategyPrev = { action: { en: 'WAIT' } };
+                    if (prices.length > 2) {
+                        const prevPrices = prices.slice(0, -1);
+                        const prevVolumes = volumes.slice(0, -1);
+                        const prevStockData = stockData.slice(0, -1);
+                        // 어제 분석 생략 (복잡도 감소를 위해) - 필요시 나중에 추가
+                        // 여기서는 간단히 흉내만 내거나, 어제의 결과를 가정한 필터링 로직 준비만 함
+                    }
+
+                    // 전체 신호 생성 (과거 복기용)
+                    // MTF는 속도를 위해 null로 전달 (필요시 데이터 추가 가능)
+                    const { markers: allSignals } = generateAllSignals(stockData, null, timeframe);
+
+                    // 1. 오늘 타점 확인 (마지막 데이터가 오늘 날짜/인덱스인 상황)
+                    const todayMarker = allSignals.find(m => m.shape === 'arrowUp' && m.time === stockData[stockData.length - 1].time);
+
+                    // 2. 어제 타점 확인 (어제 마지막 봉에 신호가 찍혔는지 확인)
+                    // 데일리 타임프레임 기준, 마지막에서 두 번째 데이터가 '어제'라고 가정 (정밀 판별 로직)
+                    const yesterdayIdx = stockData.length - 2;
+                    let yesterdayMarker = null;
+                    if (yesterdayIdx >= 0) {
+                        const yesterdayTime = stockData[yesterdayIdx].time;
+                        yesterdayMarker = allSignals.find(m => m.shape === 'arrowUp' && m.time === yesterdayTime);
+                    }
 
                     setScanResults(prev => ({
                         ...prev,
                         [currentCompany.symbol]: {
-                            action: strategy.action.en,
+                            isBuyToday: !!todayMarker,
+                            isBuyYesterday: !!yesterdayMarker,
                             currentPrice: currentPrice,
-                            targetBuyPrice: parseFloat(strategy.targetBuyPrice) || 0
+                            targetBuyPrice: parseFloat(strategyDay.targetBuyPrice) || 0
                         }
                     }));
                 }

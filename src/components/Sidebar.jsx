@@ -1,7 +1,7 @@
 import React from 'react';
 
 const Sidebar = ({ companies, onSelect, selectedSymbol, t, scanResults, scanProgress, onStartScan }) => {
-    const [filterOnlyEntry, setFilterOnlyEntry] = React.useState(false);
+    const [filterMode, setFilterMode] = React.useState('none'); // 'none', 'today', 'yesterday'
     const [searchTerm, setSearchTerm] = React.useState('');
 
     const getFilteredCompanies = () => {
@@ -16,15 +16,11 @@ const Sidebar = ({ companies, onSelect, selectedSymbol, t, scanResults, scanProg
             );
         }
 
-        // 2. BUY 타점 필터링
-        if (filterOnlyEntry) {
-            list = list.filter(c => {
-                const res = scanResults[c.symbol];
-                if (!res) return false;
-                const isBuy = res.action && res.action.includes('BUY');
-                const isGoodPrice = res.currentPrice <= res.targetBuyPrice;
-                return isBuy && isGoodPrice;
-            });
+        // 2. 분리된 필터링 로직
+        if (filterMode === 'today') {
+            list = list.filter(c => scanResults[c.symbol]?.isBuyToday);
+        } else if (filterMode === 'yesterday') {
+            list = list.filter(c => scanResults[c.symbol]?.isBuyYesterday);
         }
         return list;
     };
@@ -91,24 +87,43 @@ const Sidebar = ({ companies, onSelect, selectedSymbol, t, scanResults, scanProg
                     )}
                 </div>
 
-                {/* 타점 필터 버튼 */}
-                <button
-                    onClick={() => setFilterOnlyEntry(!filterOnlyEntry)}
-                    style={{
-                        padding: '10px 12px',
-                        fontSize: '11px',
-                        borderRadius: '20px',
-                        border: filterOnlyEntry ? 'none' : '1px solid #4CAF50',
-                        background: filterOnlyEntry ? '#4CAF50' : 'transparent',
-                        color: filterOnlyEntry ? '#FFF' : '#4CAF50',
-                        cursor: 'pointer',
-                        fontWeight: 'bold',
-                        width: '100%',
-                        transition: 'all 0.3s'
-                    }}
-                >
-                    {filterOnlyEntry ? `✓ ${t.filterBuyEntry}` : `🔍 ${t.filterBuyEntry}`}
-                </button>
+                {/* 분리된 필터 버튼 섹션 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <button
+                        onClick={() => setFilterMode(filterMode === 'today' ? 'none' : 'today')}
+                        style={{
+                            padding: '8px 12px',
+                            fontSize: '11px',
+                            borderRadius: '8px',
+                            border: filterMode === 'today' ? 'none' : '1px solid #4CAF50',
+                            background: filterMode === 'today' ? '#4CAF50' : 'transparent',
+                            color: filterMode === 'today' ? '#FFF' : '#4CAF50',
+                            cursor: 'pointer',
+                            fontWeight: 'bold',
+                            width: '100%',
+                            transition: 'all 0.3s'
+                        }}
+                    >
+                        {filterMode === 'today' ? `✓ ${t.filterTodayBuy}` : `🟢 ${t.filterTodayBuy}`}
+                    </button>
+                    <button
+                        onClick={() => setFilterMode(filterMode === 'yesterday' ? 'none' : 'yesterday')}
+                        style={{
+                            padding: '8px 12px',
+                            fontSize: '11px',
+                            borderRadius: '8px',
+                            border: filterMode === 'yesterday' ? 'none' : '1px solid #f1c40f',
+                            background: filterMode === 'yesterday' ? '#f1c40f' : 'transparent',
+                            color: filterMode === 'yesterday' ? '#000' : '#f1c40f',
+                            cursor: 'pointer',
+                            fontWeight: 'bold',
+                            width: '100%',
+                            transition: 'all 0.3s'
+                        }}
+                    >
+                        {filterMode === 'yesterday' ? `✓ ${t.filterYesterdayBuy}` : `🟡 ${t.filterYesterdayBuy}`}
+                    </button>
+                </div>
 
                 <p style={{ margin: '10px 0 0', fontSize: '0.8em', color: '#888', textAlign: 'center' }}>{t.marketCapNotice}</p>
             </div>
@@ -116,7 +131,9 @@ const Sidebar = ({ companies, onSelect, selectedSymbol, t, scanResults, scanProg
             <div style={{ flex: 1 }}>
                 {displayCompanies.map((company) => {
                     const res = scanResults[company.symbol];
-                    const isTarget = res && res.action && res.action.includes('BUY') && res.currentPrice <= res.targetBuyPrice;
+                    const isToday = res?.isBuyToday;
+                    const isYesterday = res?.isBuyYesterday;
+                    const isTarget = isToday || isYesterday;
 
                     return (
                         <div
@@ -131,7 +148,7 @@ const Sidebar = ({ companies, onSelect, selectedSymbol, t, scanResults, scanProg
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
-                                borderLeft: isTarget ? '4px solid #4CAF50' : 'none'
+                                borderLeft: isToday ? '4px solid #4CAF50' : (isYesterday ? '4px solid #f1c40f' : 'none')
                             }}
                             onMouseEnter={(e) => {
                                 if (selectedSymbol !== company.symbol) e.currentTarget.style.background = '#333';
@@ -142,14 +159,21 @@ const Sidebar = ({ companies, onSelect, selectedSymbol, t, scanResults, scanProg
                         >
                             <div style={{ flex: 1 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div style={{ fontWeight: 'bold', color: isTarget ? '#69F0AE' : '#fff' }}>
-                                        {company.symbol} {isTarget && '💎'}
+                                    <div style={{ fontWeight: 'bold', color: isToday ? '#69F0AE' : (isYesterday ? '#f1c40f' : '#fff') }}>
+                                        {company.symbol} {isToday && '🟢'} {isYesterday && '🟡'}
                                     </div>
-                                    {isTarget && (
-                                        <div style={{ fontSize: '0.65em', color: '#4CAF50', background: 'rgba(76, 175, 80, 0.1)', padding: '2px 5px', borderRadius: '4px' }}>
-                                            ENTRY
-                                        </div>
-                                    )}
+                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                        {isToday && (
+                                            <div style={{ fontSize: '0.6em', color: '#4CAF50', background: 'rgba(76, 175, 80, 0.1)', padding: '2px 4px', borderRadius: '4px' }}>
+                                                {t.badgeToday}
+                                            </div>
+                                        )}
+                                        {isYesterday && (
+                                            <div style={{ fontSize: '0.6em', color: '#f1c40f', background: 'rgba(241, 196, 15, 0.1)', padding: '2px 4px', borderRadius: '4px' }}>
+                                                {t.badgeYesterday}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                                 <div style={{ fontSize: '0.8em', color: '#aaa' }}>
                                     {company.name.length > 25 ? company.name.substring(0, 25) + '...' : company.name}
@@ -160,7 +184,7 @@ const Sidebar = ({ companies, onSelect, selectedSymbol, t, scanResults, scanProg
                 })}
                 {displayCompanies.length === 0 && (
                     <div style={{ padding: '30px 20px', textAlign: 'center', color: '#666', fontSize: '0.9em' }}>
-                        {filterOnlyEntry ? t.noEntriesFound : t.noScanDataNotice || "검색 결과가 없습니다."}
+                        {filterMode !== 'none' ? t.noEntriesFound : t.noScanDataNotice || "검색 결과가 없습니다."}
                     </div>
                 )}
             </div>

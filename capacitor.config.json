@@ -1,0 +1,5 @@
+{
+  "appId": "com.rhrl.stock",
+  "appName": "Stock Chart",
+  "webDir": "dist"
+}
