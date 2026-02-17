@@ -19,16 +19,26 @@ const SignalDecoder = ({ signal, t, lang }) => {
         );
     }
 
-    const isBuy = typeof signal.text === 'string' ? signal.text.includes('BUY') : signal.text.en.includes('BUY');
-    const isSell = typeof signal.text === 'string' ? (signal.text.includes('SELL') || signal.text.includes('STOP')) : (signal.text.en.includes('SELL') || signal.text.en.includes('STOP'));
+    // Use a key based on signal time and type to force re-render and prevent stale text from browser translators
+    const decoderKey = `${signal.time}-${signal.type || 'unknown'}`;
+
+    const isBuy = signal.type === 'BUY' || (typeof signal.text === 'string' ? signal.text.includes('BUY') : signal.text.en.includes('BUY'));
+    const isSell = signal.type === 'SELL' || (typeof signal.text === 'string' ? (signal.text.includes('SELL') || signal.text.includes('STOP')) : (signal.text.en.includes('SELL') || signal.text.en.includes('STOP')));
     const color = isBuy ? '#4CAF50' : (isSell ? '#FF5252' : '#FF9800');
 
-    const signalText = typeof signal.text === 'string' ? signal.text : signal.text[lang];
-    const signalReason = typeof signal.reason === 'string' ? signal.reason : signal.reason[lang];
-    const signalDetail = typeof signal.educationalDetail === 'string' ? signal.educationalDetail : signal.educationalDetail[lang];
+    // Robust text extraction from multi-language objects
+    const extractText = (field) => {
+        if (!field) return '';
+        if (typeof field === 'object') return field[lang] || field['en'] || '';
+        return field;
+    };
+
+    const signalText = extractText(signal.text);
+    const signalReason = extractText(signal.reason);
+    const signalDetail = extractText(signal.educationalDetail);
 
     return (
-        <div style={{
+        <div key={decoderKey} style={{
             marginTop: '30px',
             padding: '30px',
             backgroundColor: '#1a1a1a',
@@ -62,7 +72,7 @@ const SignalDecoder = ({ signal, t, lang }) => {
                     {isBuy ? '🚀' : '⚠️'}
                 </div>
                 <div>
-                    <h3 style={{ margin: 0, color: color, fontSize: '1.5em' }}>
+                    <h3 style={{ margin: 0, color: color, fontSize: '1.5em' }} translate="no">
                         [{signal.time}] {t.signalReviewTitle} {signalText}
                     </h3>
                     <p style={{ margin: '5px 0 0 0', color: '#aaa', fontWeight: 'bold' }}>
@@ -99,7 +109,7 @@ const SignalDecoder = ({ signal, t, lang }) => {
                                     background: isBuy ? 'rgba(76, 175, 80, 0.15)' : 'rgba(255, 82, 82, 0.15)',
                                     color: isBuy ? '#4CAF50' : '#FF5252',
                                     border: `1px solid ${isBuy ? '#4CAF50' : '#FF5252'}`
-                                }}>
+                                }} translate="no">
                                     {f}
                                 </span>
                             ))}
@@ -112,6 +122,13 @@ const SignalDecoder = ({ signal, t, lang }) => {
                 {t.investmentNotice}
             </div>
         </div>
+    );
+};
+
+<div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', fontSize: '0.9em', color: '#666' }}>
+    {t.investmentNotice}
+</div>
+        </div >
     );
 };
 

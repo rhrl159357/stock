@@ -168,7 +168,57 @@ const ChartComponent = ({ data, standardBar, strategy, onSignalClick, lang, refe
         };
     }, [data, standardBar, strategy, lang, referenceLines]);
 
-    return <div ref={chartContainerRef} style={{ width: '100%' }} />;
+    return (
+        <div style={{ position: 'relative' }}>
+            {/* Chart Legend (Color Guide) */}
+            <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '15px',
+                padding: '12px 15px',
+                background: '#1a1a1a',
+                borderRadius: '10px',
+                border: '1px solid #333',
+                marginBottom: '15px',
+                fontSize: '0.85em',
+                color: '#ddd',
+                alignItems: 'center',
+                boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ width: '12px', height: '3px', background: '#FF5252', borderRadius: '2px' }}></div>
+                    <span>{lang === 'ko' ? '5일선' : '5MA'}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ width: '12px', height: '3px', background: '#FFEB3B', borderRadius: '2px' }}></div>
+                    <span>{lang === 'ko' ? '20일선' : '20MA'}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ width: '12px', height: '3px', background: '#4CAF50', borderRadius: '2px' }}></div>
+                    <span>{lang === 'ko' ? '60일선' : '60MA'}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ width: '12px', height: '3px', background: '#2196F3', borderRadius: '2px' }}></div>
+                    <span>{lang === 'ko' ? '120일선' : '120MA'}</span>
+                </div>
+                <div style={{ width: '1px', height: '15px', background: '#444', margin: '0 5px' }}></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ width: '12px', height: '2px', borderBottom: '2px dashed #E040FB' }}></div>
+                    <span>{lang === 'ko' ? '허리라인' : 'Waistline'}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ width: '12px', height: '3px', background: 'rgba(0, 230, 230, 0.6)', borderRadius: '2px' }}></div>
+                    <span>{lang === 'ko' ? '기관 지지선' : 'Inst. Support'}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ width: '12px', height: '3px', background: 'rgba(255, 165, 0, 0.6)', borderRadius: '2px' }}></div>
+                    <span>{lang === 'ko' ? '기관 저항선' : 'Inst. Resistance'}</span>
+                </div>
+            </div>
+
+            <div ref={chartContainerRef} style={{ width: '100%', borderRadius: '8px', overflow: 'hidden', border: '1px solid #333' }} />
+        </div>
+    );
 };
 
 export default ChartComponent;
