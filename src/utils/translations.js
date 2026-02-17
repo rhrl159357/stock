@@ -28,7 +28,14 @@ export const translations = {
         investmentNotice: "* 이 정보는 기술적 분석 기초 이론에 근거하며, 최종 투자 결정은 본인의 판단하에 이루어져야 합니다.",
         top300Title: "미국주식 상위 300",
         marketCapNotice: "시가총액 순",
-        dailyLimitNotice: "일일 클릭 제한: 25회",
+        dailyLimitNotice: "",
+        targetBuyPriceGuide: "추천 매수가 (실시간): ",
+        filterBuyEntry: "BUY 타점 종목만 보기",
+        startScanner: "전체 종목 자동 스캔 시작",
+        scanningProgress: "스캔 진행 중...",
+        scannerComplete: "전체 스캔 완료",
+        noEntriesFound: "현재 매수 타점에 진입한 종목이 없습니다.",
+        sidebarSearchPlaceholder: "종목 코드/이름 검색...",
         timeframes: {
             "1d": "일봉",
             "1wk": "주봉"
@@ -84,7 +91,14 @@ export const translations = {
         investmentNotice: "* This info is based on technical analysis theory. Final decisions are yours alone.",
         top300Title: "Top 300 US Stocks",
         marketCapNotice: "By Market Cap",
-        dailyLimitNotice: "Daily Limit: 25 Clicks",
+        dailyLimitNotice: "",
+        targetBuyPriceGuide: "Target Buy Price (Real-time): ",
+        filterBuyEntry: "Show BUY Entries Only",
+        startScanner: "Start Auto Scanner",
+        scanningProgress: "Scanning...",
+        scannerComplete: "Scan Complete",
+        noEntriesFound: "No stocks currently at buy entry.",
+        sidebarSearchPlaceholder: "Search Symbol/Name...",
         timeframes: {
             "1d": "Daily",
             "1wk": "Weekly"

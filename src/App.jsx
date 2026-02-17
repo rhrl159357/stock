@@ -20,6 +20,8 @@ function App() {
     const [selectedSignal, setSelectedSignal] = useState(null);
     const [language, setLanguage] = useState('ko'); // 'ko' or 'en'
     const [timeframe, setTimeframe] = useState('1d'); // Default: Daily
+    const [scanResults, setScanResults] = useState({}); // { SYMBOL: { action: 'BUY', currentPrice: 150, targetBuyPrice: 155 } }
+    const [scanProgress, setScanProgress] = useState({ current: 0, total: companies.length, isScanning: false });
 
     const t = translations[language];
 
@@ -134,6 +136,16 @@ function App() {
 
                 setAnalysis({ ...marketAnalysis, strategy, standardBar: foundStandardBar, refNode, referenceLines });
 
+                // 필터용 데이터 누적
+                setScanResults(prev => ({
+                    ...prev,
+                    [symbol]: {
+                        action: strategy.action.en,
+                        currentPrice: currentPrice,
+                        targetBuyPrice: parseFloat(strategy.targetBuyPrice)
+                    }
+                }));
+
 
             } catch (err) {
                 console.error(err);
@@ -147,6 +159,65 @@ function App() {
         loadData();
     }, [symbol, personalTrades, timeframe]);
 
+    // 자동 스캐너 로직 (Background Sequential Scanner)
+    const startScanner = async () => {
+        if (scanProgress.isScanning) return;
+        setScanProgress(prev => ({ ...prev, isScanning: true, current: 0 }));
+
+        for (let i = 0; i < companies.length; i++) {
+            const currentCompany = companies[i];
+
+            // 현재 보고 있는 종목은 이미 loadData에서 처리되므로 스킵하거나 최신화
+            try {
+                const stockData = await fetchStockData(currentCompany.symbol, timeframe);
+                if (stockData.length > 0) {
+                    const prices = stockData.map(d => d.close);
+                    const volumes = stockData.map(d => d.volume);
+                    const smas = {
+                        sma5: calculateSMA(prices, 5),
+                        sma20: calculateSMA(prices, 20),
+                        sma60: calculateSMA(prices, 60),
+                        sma120: calculateSMA(prices, 120),
+                        sma240: calculateSMA(prices, 240),
+                    };
+                    const marketAnalysis = analyzeMarket(prices, volumes, smas);
+                    const rsi = calculateRSI(prices, 14);
+                    const ema200 = calculateEMA(prices, 200);
+                    const atr14 = calculateATR(stockData, 14);
+                    const bb = calculateBollingerBands(prices, 20, 2);
+                    const mfi = calculateMFI(stockData, 14);
+                    const macd = calculateMACD(prices);
+                    const sar = calculateSAR(stockData);
+                    const additionalData = { ema200, atr14, bb, mfi, macd, sar };
+
+                    const foundStandardBar = findStandardBar(stockData, smas);
+                    const refNode = calculateReferenceNode(stockData, foundStandardBar);
+                    const currentPrice = prices[prices.length - 1];
+                    const prevPrice = prices.length > 1 ? prices[prices.length - 2] : currentPrice;
+
+                    const strategy = recommendStrategy(currentPrice, smas, marketAnalysis.perfectOrder, foundStandardBar, prevPrice, prices, volumes, marketAnalysis, rsi, refNode, additionalData);
+
+                    setScanResults(prev => ({
+                        ...prev,
+                        [currentCompany.symbol]: {
+                            action: strategy.action.en,
+                            currentPrice: currentPrice,
+                            targetBuyPrice: parseFloat(strategy.targetBuyPrice) || 0
+                        }
+                    }));
+                }
+            } catch (err) {
+                console.warn(`Scanner failed for ${currentCompany.symbol}:`, err);
+            }
+
+            setScanProgress(prev => ({ ...prev, current: i + 1 }));
+            // API 과부하 방지를 위한 미세 딜레이
+            await new Promise(resolve => setTimeout(resolve, 200));
+        }
+
+        setScanProgress(prev => ({ ...prev, isScanning: false }));
+    };
+
     return (
         <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden' }}>
             <Sidebar
@@ -158,6 +229,9 @@ function App() {
                     setSelectedSignal(null);
                 }}
                 t={t}
+                scanResults={scanResults}
+                scanProgress={scanProgress}
+                onStartScan={startScanner}
             />
 
             <div style={{ flex: 1, padding: '20px', overflowY: 'auto', background: '#121212' }}>

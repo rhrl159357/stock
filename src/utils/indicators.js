@@ -897,142 +897,76 @@ export const recommendStrategy = (currentPrice, smas, perfectOrder, standardBar,
 
     const currentVol = volumes[i];
 
-    // Step 2: 허리라인
-    const waistline = refNode ? refNode.waistline : (standardBar ? standardBar.waistline : null);
+    // ── 핵심 가격 정의 (노트북LM 기반) ──
+    // 1. 추천 매수가 (Buy Target): 허리라인 혹은 SMA20 (안전 마진 확보)
+    const targetBuyPrice = refNode ? refNode.waistline : (standardBar ? standardBar.waistline : sma20);
 
-    // Step 3: 패턴 감지
+    // 2. 차트 붕괴가 (Breakdown Price): 마디 저점 혹은 전일 저가 (추세 파손)
+    const breakdownPrice = refNode ? refNode.nodeLow : (standardBar ? standardBar.low : (sma20 * 0.98));
+
+    // 패턴 및 구조 감지 (참고용)
     const data_slice = prices.map((p, idx) => ({ close: p, open: p, high: p, low: p, volume: volumes[idx] }));
     let pattern = detectPattern(data_slice, prices, volumes, smas, standardBar, refNode, additionalData);
     if (additionalData.rsiDiv === 'BULLISH_DIV') pattern = 'RSI_DIVERGENCE';
     const smc = detectSMCStructures(data_slice, i);
 
-    // ── V21 Confluence Logic ──
+    // 컨플루언스 요인 감지
     const bullishFactors = detectBullishFactors(data_slice, i, smas, additionalData, marketAnalysis, refNode, pattern, smc, standardBar);
     const bearishFactors = detectBearishFactors(data_slice, i, smas, additionalData, refNode);
 
-    // Check Volume Climax (Bearish) explicitly
-    const avgVol10 = volumes.slice(Math.max(0, i - 10), i).reduce((s, v) => s + v, 0) / Math.min(10, i);
-    const volumeClimax = currentVol > avgVol10 * 3.0; // 300% 이상
-    if (volumeClimax && currentPrice > prevPrice) bearishFactors.push("Volume Climax (Buying Exhaustion)");
-
-    // 3. Confirm Liquidity Sweep (V20 Feature)
-    // If not currently sweeping but swept recently + MSB, add to factors if MSB confirmed
-    const liquiditySweep = detectLiquiditySweep(data_slice, i);
-    let sweepIdx = -1;
-    if (!liquiditySweep) {
-        for (let j = i - 1; j >= Math.max(0, i - 5); j--) {
-            if (detectLiquiditySweep(data_slice, j)) {
-                sweepIdx = j;
-                break;
-            }
-        }
-    }
-    if (sweepIdx !== -1) {
-        const sweepCandleHigh = data_slice[sweepIdx].high;
-        if (currentPrice > sweepCandleHigh) {
-            if (!bullishFactors.includes("Liquidity Reversal (Confirmed)")) bullishFactors.push("Liquidity Reversal (Confirmed)");
-        }
-    }
-
-    const calculateConfluenceScore = () => {
-        // Base score 50. Each factor +15.
-        // 2 factors = 80 (Buy Threshold)
-        let score = 50 + (bullishFactors.length * 15);
-        if (bearishFactors.length > 0) score = 10; // Bearish override
-        return Math.min(score, 99);
-    };
-
-    const confluenceScore = calculateConfluenceScore();
-    const atr = atr14 ? atr14[i] : (currentPrice * 0.03);
-    const chandelierStop = additionalData.chandelier?.[i]?.stop;
-
+    // 결과 객체 초기화
     let result = {
         action: { ko: 'WAIT', en: 'WAIT' },
-        reason: { ko: '분석 대기 중...', en: 'Analyzing...' },
-        targetPrice: null, stopLoss: null, pattern: 'N/A',
-        score: confluenceScore,
+        reason: { ko: '분석 중...', en: 'Analyzing...' },
+        targetPrice: (currentPrice * 1.15).toFixed(2), // 기본 목표가
+        stopLoss: breakdownPrice.toFixed(2),
+        score: Math.min(50 + (bullishFactors.length * 15), 99),
         bullishFactors: bullishFactors,
-        bearishFactors: bearishFactors
+        bearishFactors: bearishFactors,
+        targetBuyPrice: targetBuyPrice.toFixed(2),
+        breakdownPrice: breakdownPrice.toFixed(2)
     };
 
-    // ── V23 Bullish Dominance Check ──
-    const bullishDominance = bullishFactors.length >= 3 && currentPrice > ema200?.[i];
+    // ── 3단계 가격 중심 신호 판정 ──
 
-    // ── Priority 1: SELL (Sensitivity: 1 Factor, but context-aware in V23) ──
-    if (bearishFactors.length >= 1) {
-        const primaryReason = bearishFactors[0];
-
-        // V23 Logic: If strong bullish dominance, downgrade minor sells to caution
-        if (bullishDominance && bearishFactors.length < 2 && !primaryReason.includes('Dead Cross') && !primaryReason.includes('Broken')) {
-            result = {
-                action: { ko: 'HOLD (눌림목 주의)', en: 'HOLD (BULLISH PULLBACK)' },
-                reason: {
-                    ko: `강력한 상승 추세 속에 일시적 리스크(${primaryReason})가 감지되었습니다. 추세 지배력이 높으므로 즉시 매도보다는 주요 지지선($${waistline?.toFixed(2)}) 이탈 여부를 관망하십시오.`,
-                    en: `Minor risk (${primaryReason}) detected within strong uptrend. High bullish dominance found; watch the support at $${waistline?.toFixed(2)} before exiting.`
-                },
-                targetPrice: (currentPrice * 1.05).toFixed(2),
-                stopLoss: waistline?.toFixed(2) || currentPrice.toFixed(2),
-                pattern: 'Bullish Pullback'
-            };
-        } else {
-            result = {
-                action: { ko: 'SELL (위험 감지)', en: 'SELL (RISK DETECTED)' },
-                reason: {
-                    ko: `1. 매도/청산 시그널 발생: ${primaryReason}.\n2. 리스크 관리가 최우선입니다. (감지된 악재: ${bearishFactors.join(', ')})`,
-                    en: `1. Sell signal detected: ${primaryReason}.\n2. Prioritize risk management. (Factors: ${bearishFactors.join(', ')})`
-                },
-                targetPrice: null, stopLoss: waistline?.toFixed(2) || currentPrice.toFixed(2),
-                pattern: primaryReason
-            };
-        }
-    }
-    // ── Priority 2: BUY (Strict Confluence: 2+ Factors) ──
-    else if (bullishFactors.length >= 2) {
-        // Construct detailed reason
-        const factorsListKo = bullishFactors.map((f, idx) => `${idx + 1}. ${f}`).join('\n');
-        const factorsListEn = bullishFactors.join(', ');
-
-        let primaryPattern = "Confluence Buy";
-        if (bullishFactors.some(f => f.includes('Squeeze'))) primaryPattern = "Power Squeeze";
-        else if (bullishFactors.some(f => f.includes('Liquidity'))) primaryPattern = "Liquidity Reversal";
-        else if (bullishFactors.some(f => f.includes('CHoCH'))) primaryPattern = "SMC Reversal";
-
-        result = {
-            action: { ko: 'BUY (강력 매수)', en: 'BUY (STRONG CONFLUENCE)' },
-            reason: {
-                ko: `엄격한 멀티 팩터 기준 충족 (${bullishFactors.length}가지).\n${factorsListKo}\n확률 높은 정석 타점입니다.`,
-                en: `Strict Multi-Factor Criteria Met (${bullishFactors.length} factors).\n${factorsListEn}\nHigh probability institutional entry.`
-            },
-            targetPrice: (currentPrice + (atr * tpMult)).toFixed(2),
-            targetPrice2: (currentPrice + (atr * tpMult * 2.0)).toFixed(2),
-            stopLoss: (chandelierStop || (currentPrice - (atr * slMult))).toFixed(2),
-            pattern: primaryPattern
+    // 1단계: SELL (차트 붕괴) - 가격이 붕괴가 이하로 내려갔을 때
+    if (currentPrice <= breakdownPrice) {
+        result.action = { ko: 'SELL (붕괴)', en: 'SELL (BREAKDOWN)' };
+        result.reason = {
+            ko: `차트가 완전히 무너졌습니다. 설정한 붕괴가($${breakdownPrice.toFixed(2)})를 이탈하여 하락 추세가 가속화될 위험이 큽니다. 즉시 매도 혹은 관망이 필요합니다.`,
+            en: `Chart completely broken. Price fell below breakdown level ($${breakdownPrice.toFixed(2)}). High risk of further decline. Exit or stay on sidelines.`
+        };
+        result.educationalDetail = {
+            ko: "리스크 관리의 핵심: 내가 생각한 지지선(붕괴가)이 깨지면 미련 없이 나오는 것이 계좌를 지키는 유일한 방법입니다.",
+            en: "Risk Management: Exiting when your predefined support (breakdown price) breaks is the only way to protect your capital."
         };
     }
-    // ── Default: HOLD / WAIT ──
+    // 2단계: BUY (매수 구간) - 가격이 매수가 이하이면서 붕괴가 위에 있을 때 (눌림목)
+    else if (currentPrice <= targetBuyPrice * 1.005) { // 0.5% 오차 허용
+        result.action = { ko: 'BUY (매수)', en: 'BUY (ENTRY)' };
+        const factorsMsg = bullishFactors.length > 0 ? `(강세 요인: ${bullishFactors.join(', ')})` : "";
+        result.reason = {
+            ko: `기다리던 매수 타점에 도달했습니다. 추천 매수가($${targetBuyPrice.toFixed(2)}) 인근은 기관의 허리라인 지지가 예상되는 정석 구역입니다. ${factorsMsg}`,
+            en: `Reached entry zone. Trading near target buy price ($${targetBuyPrice.toFixed(2)}), where institutional support at the waistline is expected. ${factorsMsg}`
+        };
+        result.educationalDetail = {
+            ko: "노트북LM 정석 매수: 가격이 내 타점(허리라인)까지 내려올 때까지 기다린 후, 지지를 확인하고 진입하는 것이 가장 유리한 손익비를 만듭니다.",
+            en: "NotebookLM Entry Strategy: Waiting for the price to reach your level (waistline) ensures the best risk-to-reward ratio."
+        };
+        const atr = atr14 ? atr14[i] : (currentPrice * 0.03);
+        result.targetPrice = (currentPrice + (atr * tpMult)).toFixed(2);
+        result.targetPrice2 = (currentPrice + (atr * tpMult * 2.0)).toFixed(2);
+    }
+    // 3단계: WAIT (기다리기) - 추세는 살아있으나 아직 매수가에 도달하지 않았을 때
     else {
-        result = {
-            action: { ko: perfectOrder ? 'HOLD' : 'WAIT', en: perfectOrder ? 'HOLD' : 'WAIT' },
-            reason: {
-                ko: perfectOrder ? '주요 이평선이 정배열로 추세를 견고하게 따르고 있습니다. 기관의 보유 흐름이 지속 중이니 기준 이탈 전까지 홀딩하십시오.' : '현재 기관의 명확한 매수/매도 의도가 포착되지 않은 관망 구간입니다. 섣부른 진입보다는 다음 기준봉을 기다리십시오.',
-                en: perfectOrder ? 'Trend intact with solid institutional order. Maintain position.' : 'No clear institutional bias. Staying on the sidelines to protect capital until next major catalyst.'
-            },
-            targetPrice: perfectOrder ? (currentPrice * 1.12).toFixed(2) : null,
-            stopLoss: perfectOrder ? (additionalData.chandelier?.[i]?.stop || sma20.toFixed(2)) : null,
-            pattern: perfectOrder ? 'Trending' : 'Sideways'
+        result.action = { ko: 'WAIT (기다리기)', en: 'WAIT (PENDING)' };
+        result.reason = {
+            ko: `추세는 무너지지 않았으나, 아직 원하는 매수가($${targetBuyPrice.toFixed(2)})까지는 조정이 오지 않았습니다. 섣부른 추격 매수보다는 타점까지 기다리는 인내가 필요합니다.`,
+            en: `Trend remains intact, but the price hasn't corrected to our target buy level ($${targetBuyPrice.toFixed(2)}) yet. Patience is required to avoid chasing the top.`
         };
-    }
-
-    // Educational Detail (Simplified for V21)
-    if (result.action.en.includes('BUY')) {
         result.educationalDetail = {
-            ko: "V21 멀티 팩터 전략: 2개 이상의 강력한 기술적 요인이 중첩될 때만 진입하여 승률을 극대화합니다.",
-            en: "V21 Multi-Factor Strategy: Enters only when 2+ strong technical factors align to maximize win rate."
-        };
-    } else if (result.action.en.includes('SELL')) {
-        result.educationalDetail = {
-            ko: "리스크 관리 우선: 단 하나의 매도 신호라도 감지되면 즉시 대응하여 손실을 방어합니다.",
-            en: "Risk First: Immediate response to any single sell signal to protect capital."
+            ko: "고수의 인내: 차트가 무너지지 않은 상태에서 타점을 기다리는 것이 손실 없는 매매의 시작입니다.",
+            en: "Expert Patience: Waiting for the entry point while the trend is still valid is the foundation of profitable trading."
         };
     }
 
@@ -1255,6 +1189,8 @@ export const generateAllSignals = (data, mtfData = null, timeframe = '15m') => {
                 educationalDetail: result.educationalDetail,
                 targetPrice: result.targetPrice,
                 stopLoss: result.stopLoss,
+                targetBuyPrice: result.targetBuyPrice,
+                breakdownPrice: result.breakdownPrice,
                 bullishFactors: result.bullishFactors,
                 bearishFactors: result.bearishFactors
             });
@@ -1270,6 +1206,8 @@ export const generateAllSignals = (data, mtfData = null, timeframe = '15m') => {
                 educationalDetail: result.educationalDetail,
                 targetPrice: result.targetPrice,
                 stopLoss: result.stopLoss,
+                targetBuyPrice: result.targetBuyPrice,
+                breakdownPrice: result.breakdownPrice,
                 bullishFactors: result.bullishFactors,
                 bearishFactors: result.bearishFactors
             });

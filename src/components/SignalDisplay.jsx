@@ -61,14 +61,14 @@ export const StrategyHeader = ({ analysis, t, lang }) => {
                         {strategy.reason[lang]}
                     </p>
                     <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginTop: '10px', flexWrap: 'wrap' }}>
+                        {strategy.targetBuyPrice && (
+                            <div style={{ fontSize: '1.2em', color: '#4CAF50', fontWeight: 'bold', border: '1px solid #4CAF50', padding: '5px 15px', borderRadius: '20px', background: 'rgba(76, 175, 80, 0.1)' }}>
+                                💎 <strong>{t.targetBuyPriceGuide}</strong> ${strategy.targetBuyPrice}
+                            </div>
+                        )}
                         {strategy.targetPrice && (
                             <div style={{ fontSize: '1.05em', color: '#FFEB3B' }}>
                                 🎯 <strong>{t.targetPriceTarget}</strong> ${strategy.targetPrice}
-                            </div>
-                        )}
-                        {strategy.targetPrice2 && (
-                            <div style={{ fontSize: '1.05em', color: '#fdd835' }}>
-                                🚀 <strong>{t.targetPriceTarget2}</strong> ${strategy.targetPrice2}
                             </div>
                         )}
                         {strategy.stopLoss && (
