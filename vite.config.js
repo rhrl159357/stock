@@ -1,12 +1,16 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import yahooProxyPlugin from './server/yahooProxy.js'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    yahooProxyPlugin(), // Yahoo Finance crumb+cookie 인증 프록시
+  ],
   server: {
     proxy: {
-      // 기본 Yahoo Finance 프록시 (query1)
+      // 기본 Yahoo Finance 프록시 (query1 - 헤더 포함)
       '/api/yahoo': {
         target: 'https://query1.finance.yahoo.com',
         changeOrigin: true,
@@ -18,7 +22,7 @@ export default defineConfig({
           'Origin': 'https://finance.yahoo.com',
         },
       },
-      // 대체 Yahoo Finance 프록시 (query2 - query1 차단 시 사용)
+      // 대체 Yahoo Finance 프록시 (query2)
       '/api/yahoo2': {
         target: 'https://query2.finance.yahoo.com',
         changeOrigin: true,

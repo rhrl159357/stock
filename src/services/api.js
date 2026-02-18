@@ -1,5 +1,5 @@
-// Yahoo Finance API 엔드포인트 목록 (query1 차단 시 query2 자동 시도)
-const API_ENDPOINTS = ['/api/yahoo', '/api/yahoo2'];
+// Yahoo Finance API 엔드포인트 목록 (인증된 프록시 → query1 → query2 순서로 시도)
+const API_ENDPOINTS = ['/api/yahoo-auth', '/api/yahoo', '/api/yahoo2'];
 let currentEndpointIdx = 0; // 한 번 성공한 엔드포인트를 기억
 
 export const fetchStockData = async (symbol, timeframe = '1d') => {
@@ -35,10 +35,8 @@ export const fetchStockData = async (symbol, timeframe = '1d') => {
                 const response = await fetch(url);
 
                 if (response.status === 429) {
-                    console.warn(`[Yahoo API] Rate limit (429). Retrying in ${delay}ms...`);
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                    delay *= 2;
-                    continue;
+                    console.warn(`[Yahoo API] Rate limit (429) via ${baseUrl}. Trying next endpoint...`);
+                    break; // 이 엔드포인트는 포기하고 다음 엔드포인트로
                 }
 
                 if (!response.ok) {
