@@ -13,6 +13,7 @@
 // ─── Utility Functions ───────────────────────────────────
 
 export const calculateSMA = (data, period) => {
+    if (!data || data.length === 0) return [];
     const sma = [];
     for (let i = 0; i < data.length; i++) {
         if (i < period - 1) { sma.push(NaN); continue; }
@@ -23,6 +24,7 @@ export const calculateSMA = (data, period) => {
 };
 
 export const calculateEMA = (data, period) => {
+    if (!data || data.length === 0) return [];
     const k = 2 / (period + 1);
     const ema = [data[0]];
     for (let i = 1; i < data.length; i++) {
@@ -32,6 +34,7 @@ export const calculateEMA = (data, period) => {
 };
 
 export const calculateATR = (data, period = 14) => {
+    if (!data || data.length < 2) return [];
     const atr = [];
     const tr = [0];
     for (let i = 1; i < data.length; i++) {
@@ -77,6 +80,7 @@ export const calculateKeltnerChannels = (data, emaPeriod = 20, atrPeriod = 10, m
 };
 
 export const calculateMFI = (data, period = 14) => {
+    if (!data || data.length === 0) return [];
     const mfi = [];
     const tp = data.map(d => (d.high + d.low + d.close) / 3);
     const rmf = tp.map((p, i) => p * data[i].volume);
@@ -96,7 +100,7 @@ export const calculateMFI = (data, period = 14) => {
 
 export const calculateRSI = (prices, period = 14) => {
     const rsi = [];
-    if (prices.length < period) return Array(prices.length).fill(null);
+    if (!prices || prices.length < period) return Array(prices ? prices.length : 0).fill(null);
     let gains = 0, losses = 0;
     for (let i = 1; i <= period; i++) {
         const diff = prices[i] - prices[i - 1];
@@ -134,7 +138,7 @@ export const calculateVolumeOscillator = (volumes, short = 5, long = 20) => {
 };
 
 export const calculateSAR = (data, step = 0.02, max = 0.2) => {
-    if (data.length < 2) return Array(data.length).fill(null);
+    if (!data || data.length < 2) return Array(data ? data.length : 0).fill(null);
     const sar = [data[0].low];
     let isBull = true;
     let ep = data[0].high;
@@ -180,6 +184,7 @@ export const calculateSAR = (data, step = 0.02, max = 0.2) => {
 };
 
 export const calculateIchimokuCloud = (data) => {
+    if (!data || data.length === 0) return { tenkan: [], kijun: [], spanA: [], spanB: [] };
     const tenkanPeriod = 9, kijunPeriod = 26, spanBPeriod = 52;
     const high = data.map(d => d.high);
     const low = data.map(d => d.low);
@@ -204,6 +209,7 @@ export const calculateIchimokuCloud = (data) => {
 };
 
 export const calculateWilliamsVixFix = (data, period = 22) => {
+    if (!data || data.length === 0) return [];
     const prices = data.map(d => d.close);
     const vixFix = [];
 
@@ -229,6 +235,7 @@ export const calculateWilliamsVixFix = (data, period = 22) => {
 };
 
 export const calculateChandelierStop = (data, atr, multiplier = 3) => {
+    if (!data || data.length === 0 || !atr) return [];
     const stops = [];
     for (let i = 0; i < data.length; i++) {
         if (isNaN(atr[i])) { stops.push(NaN); continue; }
@@ -241,6 +248,9 @@ export const calculateChandelierStop = (data, atr, multiplier = 3) => {
 // ─── Step 0: Market Analysis ─────────────────────────────
 
 export const analyzeMarket = (prices, volumes, smas) => {
+    if (!prices || prices.length < 5 || !volumes || volumes.length < 5 || !smas) {
+        return { perfectOrder: false, volumeTrend: 'neutral', convergence: false, sma5Turning: false, longMAFlattening: false };
+    }
     const i = prices.length - 1;
     if (i < 120) return { perfectOrder: false, volumeTrend: 'neutral', convergence: false, sma5Turning: false };
 
@@ -1074,7 +1084,7 @@ export const performBacktest = (data, markers, timeframe = '15m') => {
 // ─── Signal Generator (Historical) ──────────────────────
 
 export const generateAllSignals = (data, mtfData = null, timeframe = '15m') => {
-    if (!data || data.length < 50) return { markers: [], backtest: null };
+    if (!data || data.length < 20) return { markers: [], backtest: { winRate: 0, total: 0 }, referenceLines: [] };
 
     const prices = data.map(d => d.close);
     const volumes = data.map(d => d.volume);

@@ -38,17 +38,30 @@ export const fetchStockData = async (symbol, timeframe = '1d') => {
             }
 
             const data = await response.json();
-            const result = data.chart.result?.[0];
-            if (!result) throw new Error(`No data found for symbol: ${sym}`);
+
+            // 방어적 파싱: data 구조가 예상과 다를 경우 안전하게 빈 배열 반환
+            if (!data || !data.chart || !data.chart.result) {
+                console.warn(`[Yahoo API] Unexpected response format for ${sym}`);
+                return [];
+            }
+
+            const result = data.chart.result[0];
+            if (!result) {
+                console.warn(`[Yahoo API] No result data for ${sym}`);
+                return [];
+            }
 
             const timestamps = result.timestamp;
-            const indicators = result.indicators.quote[0];
-            const adjuncts = result.indicators.adjclose ? result.indicators.adjclose[0].adjclose : null;
+            const quote = result.indicators?.quote?.[0];
+            const adjuncts = result.indicators?.adjclose?.[0]?.adjclose || null;
 
-            if (!timestamps || !indicators) throw new Error(`Invalid data format for ${sym}`);
+            if (!timestamps || !quote) {
+                console.warn(`[Yahoo API] Missing timestamps or quote data for ${sym}`);
+                return [];
+            }
 
             const formattedData = timestamps.map((timestamp, index) => {
-                if (indicators.open[index] === null || indicators.close[index] === null) return null;
+                if (quote.open?.[index] == null || quote.close?.[index] == null) return null;
 
                 let timeValue;
                 if (interval === '1d' || interval === '1wk') {
@@ -60,11 +73,11 @@ export const fetchStockData = async (symbol, timeframe = '1d') => {
 
                 return {
                     time: timeValue,
-                    open: indicators.open[index],
-                    high: indicators.high[index],
-                    low: indicators.low[index],
-                    close: adjuncts && (interval === '1d' || interval === '1wk') ? adjuncts[index] : indicators.close[index],
-                    volume: indicators.volume[index],
+                    open: quote.open[index],
+                    high: quote.high[index],
+                    low: quote.low[index],
+                    close: adjuncts && (interval === '1d' || interval === '1wk') ? adjuncts[index] : quote.close[index],
+                    volume: quote.volume?.[index] || 0,
                 };
             }).filter(item => item !== null);
 
@@ -73,13 +86,15 @@ export const fetchStockData = async (symbol, timeframe = '1d') => {
         } catch (err) {
             if (attempt === maxRetries - 1) {
                 console.error('[Yahoo API Error]:', err.message);
-                throw err;
+                return []; // ★ 핵심 수정: throw 대신 빈 배열 반환 → 앱 크래시 방지
             }
             console.warn(`[Yahoo API] Attempt ${attempt + 1} failed for ${sym}. Retrying...`);
             await new Promise(resolve => setTimeout(resolve, delay));
             delay *= 2;
         }
     }
+
+    return []; // ★ 핵심 수정: 루프 종료 후에도 안전하게 빈 배열 반환
 };
 
 // Mock function to satisfy App.jsx until fully cleaned up

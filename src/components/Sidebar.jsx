@@ -5,14 +5,14 @@ const Sidebar = ({ companies, onSelect, selectedSymbol, t, scanResults, scanProg
     const [searchTerm, setSearchTerm] = React.useState('');
 
     const getFilteredCompanies = () => {
-        let list = [...companies];
+        let list = [...(companies || [])];
 
         // 1. 검색어 필터링
         if (searchTerm) {
             const lowerTerm = searchTerm.toLowerCase();
             list = list.filter(c =>
-                c.symbol.toLowerCase().includes(lowerTerm) ||
-                c.name.toLowerCase().includes(lowerTerm)
+                c.symbol?.toLowerCase().includes(lowerTerm) ||
+                c.name?.toLowerCase().includes(lowerTerm)
             );
         }
 
@@ -176,7 +176,7 @@ const Sidebar = ({ companies, onSelect, selectedSymbol, t, scanResults, scanProg
                                     </div>
                                 </div>
                                 <div style={{ fontSize: '0.8em', color: '#aaa' }}>
-                                    {company.name.length > 25 ? company.name.substring(0, 25) + '...' : company.name}
+                                    {company.name && company.name.length > 25 ? company.name.substring(0, 25) + '...' : company.name}
                                 </div>
                             </div>
                         </div>

@@ -21,7 +21,7 @@ function App() {
     const [language, setLanguage] = useState('ko'); // 'ko' or 'en'
     const [timeframe, setTimeframe] = useState('1d'); // Default: Daily
     const [scanResults, setScanResults] = useState({}); // { SYMBOL: { action: 'BUY', currentPrice: 150, targetBuyPrice: 155 } }
-    const [scanProgress, setScanProgress] = useState({ current: 0, total: companies.length, isScanning: false });
+    const [scanProgress, setScanProgress] = useState({ current: 0, total: (companies || []).length, isScanning: false });
 
     const t = translations[language];
 
@@ -52,9 +52,14 @@ function App() {
             setError(null);
             try {
                 const stockData = await fetchStockData(symbol, timeframe);
-                setData(stockData);
 
-                if (stockData.length === 0) return;
+                // ★ 방어적 처리: API가 데이터를 못 가져온 경우
+                if (!stockData || !Array.isArray(stockData) || stockData.length === 0) {
+                    setData([]);
+                    setError(`데이터를 불러올 수 없습니다 (${symbol}). 잠시 후 다시 시도해주세요.`);
+                    return;
+                }
+                setData(stockData);
 
                 const prices = stockData.map(d => d.close);
                 const volumes = stockData.map(d => d.volume);
@@ -89,7 +94,7 @@ function App() {
                 const referenceLines = findReferenceLines(stockData);
 
                 const currentPrice = prices[prices.length - 1];
-                const prevPrice = prices.length > 1 ? prices[prices.length - 2] : currentPrice;
+                const prevPrice = prices && prices.length > 1 ? prices[prices.length - 2] : currentPrice;
 
                 // Strategy with refNode & SMC data
                 const strategy = recommendStrategy(currentPrice, smas, marketAnalysis.perfectOrder, foundStandardBar, prevPrice, prices, volumes, marketAnalysis, rsi, refNode, additionalData);
@@ -180,13 +185,14 @@ function App() {
         if (scanProgress.isScanning) return;
         setScanProgress(prev => ({ ...prev, isScanning: true, current: 0 }));
 
+        if (!companies || companies.length === 0) return;
         for (let i = 0; i < companies.length; i++) {
             const currentCompany = companies[i];
 
             // 현재 보고 있는 종목은 이미 loadData에서 처리되므로 스킵하거나 최신화
             try {
                 const stockData = await fetchStockData(currentCompany.symbol, timeframe);
-                if (stockData.length > 0) {
+                if (stockData && stockData.length > 0) {
                     const prices = stockData.map(d => d.close);
                     const volumes = stockData.map(d => d.volume);
                     const smas = {
@@ -209,7 +215,7 @@ function App() {
                     const foundStandardBar = findStandardBar(stockData, smas);
                     const refNode = calculateReferenceNode(stockData, foundStandardBar);
                     const currentPrice = prices[prices.length - 1];
-                    const prevPrice = prices.length > 1 ? prices[prices.length - 2] : currentPrice;
+                    const prevPrice = prices && prices.length > 1 ? prices[prices.length - 2] : currentPrice;
 
                     const strategyDay = recommendStrategy(currentPrice, smas, marketAnalysis.perfectOrder, foundStandardBar, prevPrice, prices, volumes, marketAnalysis, rsi, refNode, additionalData);
 
